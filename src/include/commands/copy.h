@@ -30,6 +30,28 @@ typedef enum CopyHeaderChoice
 	COPY_HEADER_MATCH,
 } CopyHeaderChoice;
 
+/* These are private in commands/copy[from|to].c */
+typedef struct CopyFromStateData *CopyFromState;
+typedef struct CopyToStateData *CopyToState;
+
+/* Routines for a COPY TO format implementation. */
+typedef struct CopyToFormatOps
+{
+	/* Called when COPY TO is started. This will send a header. */
+	void		(*start) (CopyToState cstate, TupleDesc tupDesc);
+
+	/* Copy one row for COPY TO. */
+	void		(*one_row) (CopyToState cstate, TupleTableSlot *slot);
+
+	/* Called when COPY TO is ended. This will send a trailer. */
+	void		(*end) (CopyToState cstate);
+} CopyToFormatOps;
+
+/* Predefined CopyToFormatOps for "text", "csv" and "binary". */
+extern PGDLLIMPORT const CopyToFormatOps CopyToFormatOpsText;
+extern PGDLLIMPORT const CopyToFormatOps CopyToFormatOpsCSV;
+extern PGDLLIMPORT const CopyToFormatOps CopyToFormatOpsBinary;
+
 /*
  * A struct to hold COPY options, in a parsed form. All of these are related
  * to formatting, except for 'freeze', which doesn't really belong here, but
@@ -63,11 +85,8 @@ typedef struct CopyFormatOptions
 	bool	   *force_null_flags;	/* per-column CSV FN flags */
 	bool		convert_selectively;	/* do selective binary conversion? */
 	List	   *convert_select; /* list of column names (can be NIL) */
+	CopyToFormatOps to_ops;		/* how to format to */
 } CopyFormatOptions;
-
-/* These are private in commands/copy[from|to].c */
-typedef struct CopyFromStateData *CopyFromState;
-typedef struct CopyToStateData *CopyToState;
 
 typedef int (*copy_data_source_cb) (void *outbuf, int minread, int maxread);
 typedef void (*copy_data_dest_cb) (void *data, int len);

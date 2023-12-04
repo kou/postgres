@@ -427,6 +427,8 @@ ProcessCopyOptions(ParseState *pstate,
 
 	opts_out->file_encoding = -1;
 
+	/* Text is the default format. */
+	opts_out->to_ops = CopyToFormatOpsText;
 	/* Extract options from the statement node tree */
 	foreach(option, options)
 	{
@@ -442,9 +444,15 @@ ProcessCopyOptions(ParseState *pstate,
 			if (strcmp(fmt, "text") == 0)
 				 /* default format */ ;
 			else if (strcmp(fmt, "csv") == 0)
+			{
 				opts_out->csv_mode = true;
+				opts_out->to_ops = CopyToFormatOpsCSV;
+			}
 			else if (strcmp(fmt, "binary") == 0)
+			{
 				opts_out->binary = true;
+				opts_out->to_ops = CopyToFormatOpsBinary;
+			}
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
