@@ -14,8 +14,12 @@
 
 #include "executor/tuptable.h"
 
-typedef struct CopyFromStateData *CopyFromState;
 typedef struct CopyToStateData *CopyToState;
+extern void *CopyToStateGetOpaque(CopyToState cstate);
+extern void CopyToStateSetOpaque(CopyToState cstate, void *opaque);
+
+typedef struct CopyFromStateData *CopyFromState;
+
 
 typedef void (*CopyToStart_function) (CopyToState cstate, TupleDesc tupDesc);
 typedef void (*CopyToOneRow_function) (CopyToState cstate, TupleTableSlot *slot);

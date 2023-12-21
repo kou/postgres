@@ -99,6 +99,9 @@ typedef struct CopyToStateData
 	FmgrInfo   *out_functions;	/* lookup info for output functions */
 	MemoryContext rowcontext;	/* per-row evaluation context */
 	uint64		bytes_processed;	/* number of bytes processed so far */
+
+	/* For custom format implementation */
+	void *opaque; /* private space */
 } CopyToStateData;
 
 /* DestReceiver for COPY (query) TO */
@@ -130,6 +133,20 @@ static void CopySendChar(CopyToState cstate, char c);
 static void CopySendEndOfRow(CopyToState cstate);
 static void CopySendInt32(CopyToState cstate, int32 val);
 static void CopySendInt16(CopyToState cstate, int16 val);
+
+/* Exported functions that are used by custom format routines. */
+
+/* TODO: Document */
+void *CopyToStateGetOpaque(CopyToState cstate)
+{
+	return cstate->opaque;
+}
+
+/* TODO: Document */
+void CopyToStateSetOpaque(CopyToState cstate, void *opaque)
+{
+	 cstate->opaque = opaque;
+}
 
 /*
  * CopyToFormatOps implementations.
