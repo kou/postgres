@@ -17,6 +17,8 @@
 typedef struct CopyToStateData *CopyToState;
 extern void *CopyToStateGetOpaque(CopyToState cstate);
 extern void CopyToStateSetOpaque(CopyToState cstate, void *opaque);
+extern List *CopyToStateGetAttNumList(CopyToState cstate);
+
 
 typedef struct CopyFromStateData *CopyFromState;
 

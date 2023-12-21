@@ -148,6 +148,12 @@ void CopyToStateSetOpaque(CopyToState cstate, void *opaque)
 	 cstate->opaque = opaque;
 }
 
+/* TODO: Document */
+List *CopyToStateGetAttNumList(CopyToState cstate)
+{
+	return cstate->attnumlist;
+}
+
 /*
  * CopyToFormatOps implementations.
  */
