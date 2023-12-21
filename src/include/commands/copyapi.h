@@ -19,6 +19,12 @@ extern void *CopyToStateGetOpaque(CopyToState cstate);
 extern void CopyToStateSetOpaque(CopyToState cstate, void *opaque);
 extern List *CopyToStateGetAttNumList(CopyToState cstate);
 
+extern void CopyToStateSendData(CopyToState cstate, const void *databuf, int datasize);
+extern void CopyToStateSendString(CopyToState cstate, const char *str);
+extern void CopyToStateSendChar(CopyToState cstate, char c);
+extern void CopyToStateSendInt32(CopyToState cstate, int32 val);
+extern void CopyToStateSendInt16(CopyToState cstate, int16 val);
+extern void CopyToStateFlush(CopyToState cstate);
 
 typedef struct CopyFromStateData *CopyFromState;
 

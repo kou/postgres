@@ -127,12 +127,6 @@ static void CopyAttributeOutCSV(CopyToState cstate, const char *string,
 /* Low-level communications functions */
 static void SendCopyBegin(CopyToState cstate);
 static void SendCopyEnd(CopyToState cstate);
-static void CopySendData(CopyToState cstate, const void *databuf, int datasize);
-static void CopySendString(CopyToState cstate, const char *str);
-static void CopySendChar(CopyToState cstate, char c);
-static void CopySendEndOfRow(CopyToState cstate);
-static void CopySendInt32(CopyToState cstate, int32 val);
-static void CopySendInt16(CopyToState cstate, int16 val);
 
 /* Exported functions that are used by custom format routines. */
 
@@ -172,19 +166,19 @@ CopyToFormatTextSendEndOfRow(CopyToState cstate)
 		case COPY_FILE:
 			/* Default line termination depends on platform */
 #ifndef WIN32
-			CopySendChar(cstate, '\n');
+			CopyToStateSendChar(cstate, '\n');
 #else
-			CopySendString(cstate, "\r\n");
+			CopyToStateSendString(cstate, "\r\n");
 #endif
 			break;
 		case COPY_FRONTEND:
 			/* The FE/BE protocol uses \n as newline for all platforms */
-			CopySendChar(cstate, '\n');
+			CopyToStateSendChar(cstate, '\n');
 			break;
 		default:
 			break;
 	}
-	CopySendEndOfRow(cstate);
+	CopyToStateFlush(cstate);
 }
 
 static void
@@ -209,7 +203,7 @@ CopyToFormatTextStart(CopyToState cstate, TupleDesc tupDesc)
 
 	/*
 	 * For non-binary copy, we need to convert null_print to file encoding,
-	 * because it will be sent directly with CopySendString.
+	 * because it will be sent directly with CopyToStateSendString.
 	 */
 	if (cstate->need_transcoding)
 		cstate->opts.null_print_client = pg_server_to_any(cstate->opts.null_print,
@@ -227,7 +221,7 @@ CopyToFormatTextStart(CopyToState cstate, TupleDesc tupDesc)
 			char	   *colname;
 
 			if (hdr_delim)
-				CopySendChar(cstate, cstate->opts.delim[0]);
+				CopyToStateSendChar(cstate, cstate->opts.delim[0]);
 			hdr_delim = true;
 
 			colname = NameStr(TupleDescAttr(tupDesc, attnum - 1)->attname);
@@ -257,11 +251,11 @@ CopyToFormatTextOneRow(CopyToState cstate, TupleTableSlot *slot)
 		bool		isnull = slot->tts_isnull[attnum - 1];
 
 		if (need_delim)
-			CopySendChar(cstate, cstate->opts.delim[0]);
+			CopyToStateSendChar(cstate, cstate->opts.delim[0]);
 		need_delim = true;
 
 		if (isnull)
-			CopySendString(cstate, cstate->opts.null_print_client);
+			CopyToStateSendString(cstate, cstate->opts.null_print_client);
 		else
 		{
 			char	   *string;
@@ -310,11 +304,11 @@ CopyToFormatBinaryStart(CopyToState cstate, TupleDesc tupDesc)
 
 	/* Generate header for a binary copy */
 	/* Signature */
-	CopySendData(cstate, BinarySignature, 11);
+	CopyToStateSendData(cstate, BinarySignature, 11);
 	/* Flags field */
-	CopySendInt32(cstate, 0);
+	CopyToStateSendInt32(cstate, 0);
 	/* No header extension */
-	CopySendInt32(cstate, 0);
+	CopyToStateSendInt32(cstate, 0);
 }
 
 static void
@@ -324,7 +318,7 @@ CopyToFormatBinaryOneRow(CopyToState cstate, TupleTableSlot *slot)
 	ListCell   *cur;
 
 	/* Binary per-tuple header */
-	CopySendInt16(cstate, list_length(cstate->attnumlist));
+	CopyToStateSendInt16(cstate, list_length(cstate->attnumlist));
 
 	foreach(cur, cstate->attnumlist)
 	{
@@ -333,28 +327,28 @@ CopyToFormatBinaryOneRow(CopyToState cstate, TupleTableSlot *slot)
 		bool		isnull = slot->tts_isnull[attnum - 1];
 
 		if (isnull)
-			CopySendInt32(cstate, -1);
+			CopyToStateSendInt32(cstate, -1);
 		else
 		{
 			bytea	   *outputbytes;
 
 			outputbytes = SendFunctionCall(&out_functions[attnum - 1], value);
-			CopySendInt32(cstate, VARSIZE(outputbytes) - VARHDRSZ);
-			CopySendData(cstate, VARDATA(outputbytes),
+			CopyToStateSendInt32(cstate, VARSIZE(outputbytes) - VARHDRSZ);
+			CopyToStateSendData(cstate, VARDATA(outputbytes),
 						 VARSIZE(outputbytes) - VARHDRSZ);
 		}
 	}
 
-	CopySendEndOfRow(cstate);
+	CopyToStateFlush(cstate);
 }
 
 static void
 CopyToFormatBinaryEnd(CopyToState cstate)
 {
 	/* Generate trailer for a binary copy */
-	CopySendInt16(cstate, -1);
+	CopyToStateSendInt16(cstate, -1);
 	/* Need to flush out the trailer */
-	CopySendEndOfRow(cstate);
+	CopyToStateFlush(cstate);
 }
 
 /*
@@ -388,35 +382,35 @@ SendCopyEnd(CopyToState cstate)
 }
 
 /*----------
- * CopySendData sends output data to the destination (file or frontend)
- * CopySendString does the same for null-terminated strings
- * CopySendChar does the same for single characters
- * CopySendEndOfRow does the appropriate thing at end of each data row
- *	(data is not actually flushed except by CopySendEndOfRow)
+ * CopyToStateSendData sends output data to the destination (file or frontend)
+ * CopyToStateSendString does the same for null-terminated strings
+ * CopyToStateSendChar does the same for single characters
+ * CopyToStateFlush does the appropriate thing at end of each data row
+ *	(data is not actually flushed except by CopyToStateFlush)
  *
  * NB: no data conversion is applied by these functions
  *----------
  */
-static void
-CopySendData(CopyToState cstate, const void *databuf, int datasize)
+void
+CopyToStateSendData(CopyToState cstate, const void *databuf, int datasize)
 {
 	appendBinaryStringInfo(cstate->fe_msgbuf, databuf, datasize);
 }
 
-static void
-CopySendString(CopyToState cstate, const char *str)
+void
+CopyToStateSendString(CopyToState cstate, const char *str)
 {
 	appendBinaryStringInfo(cstate->fe_msgbuf, str, strlen(str));
 }
 
-static void
-CopySendChar(CopyToState cstate, char c)
+void
+CopyToStateSendChar(CopyToState cstate, char c)
 {
 	appendStringInfoCharMacro(cstate->fe_msgbuf, c);
 }
 
-static void
-CopySendEndOfRow(CopyToState cstate)
+void
+CopyToStateFlush(CopyToState cstate)
 {
 	StringInfo	fe_msgbuf = cstate->fe_msgbuf;
 
@@ -477,27 +471,27 @@ CopySendEndOfRow(CopyToState cstate)
  */
 
 /*
- * CopySendInt32 sends an int32 in network byte order
+ * CopyToStateSendInt32 sends an int32 in network byte order
  */
-static inline void
-CopySendInt32(CopyToState cstate, int32 val)
+void
+CopyToStateSendInt32(CopyToState cstate, int32 val)
 {
 	uint32		buf;
 
 	buf = pg_hton32((uint32) val);
-	CopySendData(cstate, &buf, sizeof(buf));
+	CopyToStateSendData(cstate, &buf, sizeof(buf));
 }
 
 /*
- * CopySendInt16 sends an int16 in network byte order
+ * CopyToStateSendInt16 sends an int16 in network byte order
  */
-static inline void
-CopySendInt16(CopyToState cstate, int16 val)
+void
+CopyToStateSendInt16(CopyToState cstate, int16 val)
 {
 	uint16		buf;
 
 	buf = pg_hton16((uint16) val);
-	CopySendData(cstate, &buf, sizeof(buf));
+	CopyToStateSendData(cstate, &buf, sizeof(buf));
 }
 
 /*
@@ -1057,7 +1051,7 @@ CopyOneRowTo(CopyToState cstate, TupleTableSlot *slot)
 #define DUMPSOFAR() \
 	do { \
 		if (ptr > start) \
-			CopySendData(cstate, start, ptr - start); \
+			CopyToStateSendData(cstate, start, ptr - start); \
 	} while (0)
 
 static void
@@ -1076,7 +1070,7 @@ CopyAttributeOutText(CopyToState cstate, const char *string)
 	/*
 	 * We have to grovel through the string searching for control characters
 	 * and instances of the delimiter character.  In most cases, though, these
-	 * are infrequent.  To avoid overhead from calling CopySendData once per
+	 * are infrequent.  To avoid overhead from calling CopyToStateSendData once per
 	 * character, we dump out all characters between escaped characters in a
 	 * single call.  The loop invariant is that the data from "start" to "ptr"
 	 * can be sent literally, but hasn't yet been.
@@ -1131,14 +1125,14 @@ CopyAttributeOutText(CopyToState cstate, const char *string)
 				}
 				/* if we get here, we need to convert the control char */
 				DUMPSOFAR();
-				CopySendChar(cstate, '\\');
-				CopySendChar(cstate, c);
+				CopyToStateSendChar(cstate, '\\');
+				CopyToStateSendChar(cstate, c);
 				start = ++ptr;	/* do not include char in next run */
 			}
 			else if (c == '\\' || c == delimc)
 			{
 				DUMPSOFAR();
-				CopySendChar(cstate, '\\');
+				CopyToStateSendChar(cstate, '\\');
 				start = ptr++;	/* we include char in next run */
 			}
 			else if (IS_HIGHBIT_SET(c))
@@ -1191,14 +1185,14 @@ CopyAttributeOutText(CopyToState cstate, const char *string)
 				}
 				/* if we get here, we need to convert the control char */
 				DUMPSOFAR();
-				CopySendChar(cstate, '\\');
-				CopySendChar(cstate, c);
+				CopyToStateSendChar(cstate, '\\');
+				CopyToStateSendChar(cstate, c);
 				start = ++ptr;	/* do not include char in next run */
 			}
 			else if (c == '\\' || c == delimc)
 			{
 				DUMPSOFAR();
-				CopySendChar(cstate, '\\');
+				CopyToStateSendChar(cstate, '\\');
 				start = ptr++;	/* we include char in next run */
 			}
 			else
@@ -1265,7 +1259,7 @@ CopyAttributeOutCSV(CopyToState cstate, const char *string,
 
 	if (use_quote)
 	{
-		CopySendChar(cstate, quotec);
+		CopyToStateSendChar(cstate, quotec);
 
 		/*
 		 * We adopt the same optimization strategy as in CopyAttributeOutText
@@ -1276,7 +1270,7 @@ CopyAttributeOutCSV(CopyToState cstate, const char *string,
 			if (c == quotec || c == escapec)
 			{
 				DUMPSOFAR();
-				CopySendChar(cstate, escapec);
+				CopyToStateSendChar(cstate, escapec);
 				start = ptr;	/* we include char in next run */
 			}
 			if (IS_HIGHBIT_SET(c) && cstate->encoding_embeds_ascii)
@@ -1286,12 +1280,12 @@ CopyAttributeOutCSV(CopyToState cstate, const char *string,
 		}
 		DUMPSOFAR();
 
-		CopySendChar(cstate, quotec);
+		CopyToStateSendChar(cstate, quotec);
 	}
 	else
 	{
 		/* If it doesn't need quoting, we can just dump it as-is */
-		CopySendString(cstate, ptr);
+		CopyToStateSendString(cstate, ptr);
 	}
 }
 
