@@ -1822,6 +1822,14 @@ common_warning_flags = [
   '-Wimplicit-fallthrough=3',
   '-Wcast-function-type',
   '-Wshadow=compatible-local',
+  # This is for preventing the "cc1: warning: '-Wformat-security'
+  # ignored without '-Wformat' [-Wformat-security]" warning. We don't
+  # need this for PostgreSQL itself. This is just for
+  # extensions. Extensions use "pg_config --cflags" to build
+  # themselves. If extensions use only -Wformat-security, the warning
+  # is shown. If we have this here, extensions use both of -Wformat
+  # and -Wformat-security. So the warning isn't shown.
+  '-Wformat',
   # This was included in -Wall/-Wformat in older GCC versions
   '-Wformat-security',
 ]
