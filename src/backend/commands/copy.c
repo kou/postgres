@@ -484,32 +484,19 @@ ProcessCopyOptions(ParseState *pstate,
 			format_specified = true;
 
 			if (is_from)
-			{
-				char	   *fmt = defGetString(defel);
-
-				if (strcmp(fmt, "text") == 0)
-					 /* default format */ ;
-				else if (strcmp(fmt, "csv") == 0)
-				{
-					opts_out->csv_mode = true;
-				}
-				else if (strcmp(fmt, "binary") == 0)
-				{
-					opts_out->binary = true;
-				}
-				else
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-							 errmsg("COPY format \"%s\" not recognized", fmt),
-							 parser_errposition(pstate, defel->location)));
-			}
+				ProcessCopyOptionFormatFrom(pstate, opts_out, cstate, defel);
 			else
 				ProcessCopyOptionFormatTo(pstate, opts_out, cstate, defel);
 		}
 	}
 	if (!format_specified)
+	{
 		/* Set the default format. */
-		ProcessCopyOptionFormatTo(pstate, opts_out, cstate, NULL);
+		if (is_from)
+			ProcessCopyOptionFormatFrom(pstate, opts_out, cstate, NULL);
+		else
+			ProcessCopyOptionFormatTo(pstate, opts_out, cstate, NULL);
+	}
 
 	/*
 	 * Extract options except "format" from the statement node tree. Unknown
@@ -857,7 +844,9 @@ ProcessCopyOptions(ParseState *pstate,
 		DefElem    *defel = lfirst_node(DefElem, option);
 		bool		processed = false;
 
-		if (!is_from)
+		if (is_from)
+			processed = opts_out->from_routine->CopyFromProcessOption(cstate, defel);
+		else
 			processed = opts_out->to_routine->CopyToProcessOption(cstate, defel);
 		if (!processed)
 			ereport(ERROR,
