@@ -84,7 +84,8 @@ typedef struct CopyFormatOptions
 	CopyOnErrorChoice on_error; /* what to do when error happened */
 	CopyLogVerbosityChoice log_verbosity;	/* verbosity of logged messages */
 	List	   *convert_select; /* list of column names (can be NIL) */
-	Node	   *routine;		/* CopyToRoutine (can be NULL) */
+	Node	   *routine;		/* CopyToRoutine or CopyFromRoutine (can be
+								 * NULL) */
 } CopyFormatOptions;
 
 /* This is private in commands/copyfrom.c */
@@ -96,6 +97,8 @@ typedef struct CopyFromStateData *CopyFromState;
  */
 typedef struct CopyFromRoutine
 {
+	NodeTag		type;
+
 	/*
 	 * Called when COPY FROM is started to set up the input functions
 	 * associated with the relation's attributes writing to.  `finfo` can be
