@@ -26,6 +26,8 @@ typedef struct CopyToStateData *CopyToState;
  */
 typedef struct CopyToRoutine
 {
+	NodeTag		type;
+
 	/*
 	 * Called when COPY TO is started to set up the output functions
 	 * associated with the relation's attributes reading from.  `finfo` can be
