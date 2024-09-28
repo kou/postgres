@@ -1003,6 +1003,11 @@ NextCopyFrom(CopyFromState cstate, ExprContext *econtext,
 
 		Assert(fieldno == attr_count);
 	}
+	else if (cstate->routine)
+	{
+		if (!cstate->routine->CopyFromOneRow(cstate, econtext, values, nulls))
+			return false;
+	}
 	else
 	{
 		/* binary */
