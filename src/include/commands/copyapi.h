@@ -54,6 +54,8 @@ typedef struct CopyToRoutine
 	void		(*CopyToEnd) (CopyToState cstate);
 } CopyToRoutine;
 
+extern void CopyToStateFlush(CopyToState cstate);
+
 /*
  * API structure for a COPY FROM format implementation.	 Note this must be
  * allocated in a server-lifetime manner, typically as a static const struct.

@@ -78,6 +78,9 @@ typedef struct CopyToStateData
 	FmgrInfo   *out_functions;	/* lookup info for output functions */
 	MemoryContext rowcontext;	/* per-row evaluation context */
 	uint64		bytes_processed;	/* number of bytes processed so far */
+
+	/* For custom format implementation */
+	void	   *opaque;			/* private space */
 } CopyToStateData;
 
 #endif							/* COPYTO_INTERNAL_H */
