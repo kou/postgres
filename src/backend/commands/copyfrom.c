@@ -129,6 +129,7 @@ static void CopyFromBinaryEnd(CopyFromState cstate);
 
 /* text format */
 static const CopyFromRoutine CopyFromRoutineText = {
+	.type = T_CopyFromRoutine,
 	.CopyFromInFunc = CopyFromTextLikeInFunc,
 	.CopyFromStart = CopyFromTextLikeStart,
 	.CopyFromOneRow = CopyFromTextOneRow,
@@ -137,6 +138,7 @@ static const CopyFromRoutine CopyFromRoutineText = {
 
 /* CSV format */
 static const CopyFromRoutine CopyFromRoutineCSV = {
+	.type = T_CopyFromRoutine,
 	.CopyFromInFunc = CopyFromTextLikeInFunc,
 	.CopyFromStart = CopyFromTextLikeStart,
 	.CopyFromOneRow = CopyFromCSVOneRow,
@@ -145,6 +147,7 @@ static const CopyFromRoutine CopyFromRoutineCSV = {
 
 /* binary format */
 static const CopyFromRoutine CopyFromRoutineBinary = {
+	.type = T_CopyFromRoutine,
 	.CopyFromInFunc = CopyFromBinaryInFunc,
 	.CopyFromStart = CopyFromBinaryStart,
 	.CopyFromOneRow = CopyFromBinaryOneRow,
@@ -153,15 +156,32 @@ static const CopyFromRoutine CopyFromRoutineBinary = {
 
 /* Return a COPY FROM routine for the given options */
 static const CopyFromRoutine *
-CopyFromGetRoutine(CopyFormatOptions opts)
+CopyFromGetRoutine(CopyFormatOptions *opts)
 {
-	if (opts.csv_mode)
-		return &CopyFromRoutineCSV;
-	else if (opts.binary)
-		return &CopyFromRoutineBinary;
+	if (OidIsValid(opts->handler))
+	{
+		Datum		datum;
+		Node	   *routine;
 
-	/* default is text */
-	return &CopyFromRoutineText;
+		datum = OidFunctionCall1(opts->handler, BoolGetDatum(true));
+		routine = (Node *) DatumGetPointer(datum);
+		if (routine == NULL || !IsA(routine, CopyFromRoutine))
+			ereport(
+					ERROR,
+					(errcode(
+							 ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("COPY handler function "
+							"%u did not return "
+							"CopyFromRoutine struct",
+							opts->handler)));
+		return castNode(CopyFromRoutine, routine);
+	}
+	else if (opts->csv_mode)
+		return &CopyFromRoutineCSV;
+	else if (opts->binary)
+		return &CopyFromRoutineBinary;
+	else
+		return &CopyFromRoutineText;
 }
 
 /* Implementation of the start callback for text and CSV formats */
@@ -1567,7 +1587,7 @@ BeginCopyFrom(ParseState *pstate,
 	ProcessCopyOptions(pstate, &cstate->opts, true /* is_from */ , options);
 
 	/* Set the format routine */
-	cstate->routine = CopyFromGetRoutine(cstate->opts);
+	cstate->routine = CopyFromGetRoutine(&cstate->opts);
 
 	/* Process the target relation */
 	cstate->rel = rel;
