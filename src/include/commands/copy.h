@@ -90,7 +90,7 @@ typedef struct CopyFormatOptions
 	Oid			handler;		/* handler function for custom format routine */
 } CopyFormatOptions;
 
-/* These are private in commands/copy[from|to].c */
+/* These are private in commands/copy[from|to]_internal.h */
 typedef struct CopyFromStateData *CopyFromState;
 typedef struct CopyToStateData *CopyToState;
 
