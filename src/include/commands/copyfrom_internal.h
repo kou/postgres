@@ -24,9 +24,9 @@
  */
 typedef enum CopySource
 {
-	COPY_FILE,					/* from file (or a piped program) */
-	COPY_FRONTEND,				/* from frontend */
-	COPY_CALLBACK,				/* from callback function */
+	COPY_SOURCE_FILE,			/* from file (or a piped program) */
+	COPY_SOURCE_FRONTEND,		/* from frontend */
+	COPY_SOURCE_CALLBACK,		/* from callback function */
 } CopySource;
 
 /*
