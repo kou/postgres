@@ -104,4 +104,6 @@ typedef struct CopyFromRoutine
 	void		(*CopyFromEnd) (CopyFromState cstate);
 } CopyFromRoutine;
 
+extern int	CopyFromStateGetData(CopyFromState cstate, void *dest, int minread, int maxread);
+
 #endif							/* COPYAPI_H */

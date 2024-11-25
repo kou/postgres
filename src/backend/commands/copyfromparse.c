@@ -731,6 +731,17 @@ CopyReadBinaryData(CopyFromState cstate, char *dest, int nbytes)
 }
 
 /*
+ * Export CopyGetData() for extensions. We want to keep CopyGetData() as a
+ * static function for optimization. CopyGetData() calls in this file may be
+ * optimized by a compiler.
+ */
+int
+CopyFromStateGetData(CopyFromState cstate, void *dest, int minread, int maxread)
+{
+	return CopyGetData(cstate, dest, minread, maxread);
+}
+
+/*
  * Read raw fields in the next line for COPY FROM in text or csv mode.
  * Return false if no more lines.
  *
