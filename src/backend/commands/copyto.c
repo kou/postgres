@@ -150,6 +150,7 @@ static void CopySendInt16(CopyToState cstate, int16 val);
 
 /* text format */
 static const CopyToRoutine CopyToRoutineText = {
+	.type = T_CopyToRoutine,
 	.CopyToStart = CopyToTextLikeStart,
 	.CopyToOutFunc = CopyToTextLikeOutFunc,
 	.CopyToOneRow = CopyToTextOneRow,
@@ -158,6 +159,7 @@ static const CopyToRoutine CopyToRoutineText = {
 
 /* CSV format */
 static const CopyToRoutine CopyToRoutineCSV = {
+	.type = T_CopyToRoutine,
 	.CopyToStart = CopyToTextLikeStart,
 	.CopyToOutFunc = CopyToTextLikeOutFunc,
 	.CopyToOneRow = CopyToCSVOneRow,
@@ -166,6 +168,7 @@ static const CopyToRoutine CopyToRoutineCSV = {
 
 /* binary format */
 static const CopyToRoutine CopyToRoutineBinary = {
+	.type = T_CopyToRoutine,
 	.CopyToStart = CopyToBinaryStart,
 	.CopyToOutFunc = CopyToBinaryOutFunc,
 	.CopyToOneRow = CopyToBinaryOneRow,
@@ -174,15 +177,32 @@ static const CopyToRoutine CopyToRoutineBinary = {
 
 /* Return a COPY TO routine for the given options */
 static const CopyToRoutine *
-CopyToGetRoutine(CopyFormatOptions opts)
+CopyToGetRoutine(CopyFormatOptions *opts)
 {
-	if (opts.csv_mode)
-		return &CopyToRoutineCSV;
-	else if (opts.binary)
-		return &CopyToRoutineBinary;
+	if (OidIsValid(opts->handler))
+	{
+		Datum		datum;
+		Node	   *routine;
 
-	/* default is text */
-	return &CopyToRoutineText;
+		datum = OidFunctionCall1(opts->handler, BoolGetDatum(false));
+		routine = (Node *) DatumGetPointer(datum);
+		if (routine == NULL || !IsA(routine, CopyToRoutine))
+			ereport(
+					ERROR,
+					(errcode(
+							 ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("COPY handler function "
+							"%u did not return "
+							"CopyToRoutine struct",
+							opts->handler)));
+		return castNode(CopyToRoutine, routine);
+	}
+	else if (opts->csv_mode)
+		return &CopyToRoutineCSV;
+	else if (opts->binary)
+		return &CopyToRoutineBinary;
+	else
+		return &CopyToRoutineText;
 }
 
 /* Implementation of the start callback for text and CSV formats */
@@ -703,7 +723,7 @@ BeginCopyTo(ParseState *pstate,
 	ProcessCopyOptions(pstate, &cstate->opts, false /* is_from */ , options);
 
 	/* Set format routine */
-	cstate->routine = CopyToGetRoutine(cstate->opts);
+	cstate->routine = CopyToGetRoutine(&cstate->opts);
 
 	/* Process the source/target relation or query */
 	if (rel)
